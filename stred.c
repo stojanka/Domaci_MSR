@@ -12,6 +12,7 @@
 #include <linux/slab.h>
 #include <linux/semaphore.h>
 #include <linux/wait.h>
+#define STRED_SIZE 100
 MODULE_LICENSE("Dual BSD/GPL");
 
 dev_t my_dev_id;
@@ -24,6 +25,7 @@ DECLARE_WAIT_QUEUE_HEAD(readQueue);
 struct semaphore sem;
 char stred[100]; //realloc
 int endRead = 0;
+
 
 int stred_open(struct inode *pinode, struct file *pfile);
 int stred_close(struct inode *pinode, struct file *pfile);
@@ -55,17 +57,11 @@ int stred_close(struct inode *pinode, struct file *pfile)
 ssize_t stred_write(struct file *pfile, const char __user *buffer, size_t length, loff_t *offset)
 {
 	char *buff = (char *)kmalloc(length, GFP_KERNEL); //*buff je niz pokazivaca na char
-  char string[] = "string=";
-  char clear[] = "clear";
-  char shrink[] = "shrink";
-  char append[]= "append=";
-  char truncate[]="truncate=";
-  char remove[]="remove";
-
-  char stred_cpy[100];
+  char stred_cpy[STRED_SIZE];
+  char *pom;
 
   int ret;
-  int i, j;
+  int i,j;
 
   ret = copy_from_user(buff, buffer, length);
   if(ret)
@@ -73,7 +69,7 @@ ssize_t stred_write(struct file *pfile, const char __user *buffer, size_t length
   buff[length-1] = '\0';
 
 
-  if(strncmp(buff, string, strlen(string)) == 0){
+  if(strncmp(buff, "string=", 7) == 0){
     //ret = sscanf(buff, "%s", buff+strlen(string));
     //buff = buff + strlen(string);
 
@@ -88,7 +84,7 @@ ssize_t stred_write(struct file *pfile, const char __user *buffer, size_t length
 
   }
 
-  if(strncmp(buff, clear, strlen(clear)) == 0){
+  if(strncmp(buff, "clear", 5) == 0){
 
     for(i=0; i< strlen(stred); i++){
       stred[i] = '0';
@@ -96,7 +92,7 @@ ssize_t stred_write(struct file *pfile, const char __user *buffer, size_t length
     }
   }
 
-  if(strncmp(buff, shrink, strlen(shrink)) == 0){
+  if(strncmp(buff, "shrink", 6) == 0){
 		strcpy(stred_cpy, stred);
     strim(stred);
 
@@ -108,7 +104,7 @@ ssize_t stred_write(struct file *pfile, const char __user *buffer, size_t length
 		}
   }
 
-  if(strncmp(buff, append, strlen(append)) == 0){
+  if(strncmp(buff, "append=", 7) == 0){
 
     strsep(&buff, "=");
 		if (strlen(stred)+strlen(buff)>99)
@@ -122,41 +118,65 @@ ssize_t stred_write(struct file *pfile, const char __user *buffer, size_t length
 
   }
 
-  if(strncmp(buff, truncate, strlen(truncate)) == 0){
+  if(strncmp(buff, "truncate=", 9) == 0){
 		strsep(&buff, "=");
 		kstrtoint(buff, 10, &ret);
 		stred[strlen(stred)-ret] = '\0';
   }
 
-  if(strncmp(buff, remove, strlen(remove)) == 0){
+  if(strncmp(buff, "remove=", 6) == 0){
+		strim(buff);
 		strsep(&buff, "=");
 
-		for(i=0; i< strlen(stred); i++){
-			for(j=0; j < strlen(buff); j++){
-				if(buff[j]==stred[j]){
-						strreplace(stred, buff[j], ' ');
-				}
+
+	if(strstr(stred, buff) == NULL)
+	{
+		printk("Word not found \n");
+	}else
+	{
+		while(strstr(stred, buff)!=NULL){
+			pom = strstr(stred, buff);
+ 			for (i=0; i < strlen(buff)+1 ; i++){
+				if(i==strlen(buff) && *(pom+i)!=' '){
+		      *(pom+i) = '\0';
+		    }else{
+		      *(pom+i) = '#';
+		    }
 			}
-		}
+
+
+		//brisanje '#'
+		j=0;
+	  for(i=0; stred[i]!= '\0'; i++){
+			if((stred[i]!='#') || ((stred[i]!='#') && (stred[i+1]!=' '))){
+			  stred[j++] = stred[i];
+		  }
+	  }
+stred[j] = '\0';
+
+}//od while
+}
+} // od remove
 //treba provjeriti da li je osobodjeno dovoljno prostora za upis u stred
-
-  }
-
+  //}
 
 
 
-	wake_up_interruptible(&writeQueue);
+
+//wake_up_interruptible(&writeQueue);
 
 printk("Buff je: %s \n", buff);
 printk("Stred je: %s \n", stred);
   kfree(buff);
 	return length;
-}
 
+}
 
 ssize_t stred_read(struct file *pfile, char __user *buffer, size_t length, loff_t *offset)
 {
-
+//char stred[STRED_SIZE];
+//long int len = 0;
+/*
 	if (endRead){
 		endRead = 0;
 		return 0;
@@ -172,7 +192,7 @@ ssize_t stred_read(struct file *pfile, char __user *buffer, size_t length, loff_
 		if(down_interruptible(&sem))
 			return -ERESTARTSYS;
 	}
-
+*/
 
 return length;
 }
