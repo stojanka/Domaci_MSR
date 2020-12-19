@@ -23,10 +23,12 @@ static struct cdev *my_cdev;
 DECLARE_WAIT_QUEUE_HEAD(writeQueue);
 DECLARE_WAIT_QUEUE_HEAD(readQueue);
 struct semaphore sem;
-char stred[100]; //realloc
+struct fasync_struct *async_queue;
+
+char stred[100];
 int endRead = 0;
 
-
+static int stred_fasync(int fd,struct file *file, int mode);
 int stred_open(struct inode *pinode, struct file *pfile);
 int stred_close(struct inode *pinode, struct file *pfile);
 ssize_t stred_read(struct file *pfile, char __user *buffer, size_t length, loff_t *offset);
@@ -39,8 +41,14 @@ struct file_operations my_fops =
 	.read = stred_read,
 	.write = stred_write,
 	.release = stred_close,
+	.fasync = stred_fasync,
 
 };
+
+static int stred_fasync(int fd,struct file *file, int mode)
+{
+    return fasync_helper(fd, file, mode, &async_queue);
+}
 
 int stred_open(struct inode *pinode, struct file *pfile)
 {
@@ -68,10 +76,26 @@ ssize_t stred_write(struct file *pfile, const char __user *buffer, size_t length
   		return -EFAULT;
   buff[length-1] = '\0';
 
+	if(strlen(stred) < 99){
+		ret = sscanf(buff,"%s", stred);
+
+	}else{
+		printk(KERN_WARNING "Stred is full\n");
+	}
+
+	while(strlen(stred) == 99)
+	{
+		up(&sem);
+		if(wait_event_interruptible(writeQueue,(strlen(stred)<99)))
+			return -ERESTARTSYS;
+		if(down_interruptible(&sem))
+			return -ERESTARTSYS;
+	}
+
+	up(&sem);
+	wake_up_interruptible(&readQueue);
 
   if(strncmp(buff, "string=", 7) == 0){
-    //ret = sscanf(buff, "%s", buff+strlen(string));
-    //buff = buff + strlen(string);
 
     strsep(&buff, "=");
 		if (strlen(stred)+strlen(buff)>99)
@@ -81,7 +105,6 @@ ssize_t stred_write(struct file *pfile, const char __user *buffer, size_t length
 			return -ERESTARTSYS;
 
 		strcpy(stred, buff);
-
   }
 
   if(strncmp(buff, "clear", 5) == 0){
@@ -95,13 +118,7 @@ ssize_t stred_write(struct file *pfile, const char __user *buffer, size_t length
   if(strncmp(buff, "shrink", 6) == 0){
 		strcpy(stred_cpy, stred);
     strim(stred);
-
-		//provjera da li se oslobodilo dovoljno prostora za upis stringa koji ceka
-		if(strlen(buff)<=99){
-			if(strlen(stred_cpy)-strlen(stred) == strlen(buff)){
-				wake_up_interruptible(&writeQueue);
-			}
-		}
+		wake_up_interruptible(&writeQueue);
   }
 
   if(strncmp(buff, "append=", 7) == 0){
@@ -113,21 +130,20 @@ ssize_t stred_write(struct file *pfile, const char __user *buffer, size_t length
 		if(wait_event_interruptible(writeQueue,(strlen(stred)+strlen(buff)<=99)))
 			return -ERESTARTSYS;
 
-
 		strncat(stred, buff, strlen(buff));
-
   }
 
   if(strncmp(buff, "truncate=", 9) == 0){
 		strsep(&buff, "=");
 		kstrtoint(buff, 10, &ret);
 		stred[strlen(stred)-ret] = '\0';
+
+		wake_up_interruptible(&writeQueue);
   }
 
   if(strncmp(buff, "remove=", 6) == 0){
 		strim(buff);
 		strsep(&buff, "=");
-
 
 	if(strstr(stred, buff) == NULL)
 	{
@@ -144,7 +160,6 @@ ssize_t stred_write(struct file *pfile, const char __user *buffer, size_t length
 		    }
 			}
 
-
 		//brisanje '#'
 		j=0;
 	  for(i=0; stred[i]!= '\0'; i++){
@@ -155,15 +170,10 @@ ssize_t stred_write(struct file *pfile, const char __user *buffer, size_t length
 stred[j] = '\0';
 
 }//od while
-}
+} // od else
+wake_up_interruptible(&writeQueue);
 } // od remove
-//treba provjeriti da li je osobodjeno dovoljno prostora za upis u stred
-  //}
 
-
-
-
-//wake_up_interruptible(&writeQueue);
 
 printk("Buff je: %s \n", buff);
 printk("Stred je: %s \n", stred);
@@ -172,16 +182,33 @@ printk("Stred je: %s \n", stred);
 
 }
 
+
 ssize_t stred_read(struct file *pfile, char __user *buffer, size_t length, loff_t *offset)
 {
-//char stred[STRED_SIZE];
-//long int len = 0;
-/*
+	int ret;
+char buff[STRED_SIZE];
+long int len = 0;
+int l=0;
+
 	if (endRead){
 		endRead = 0;
 		return 0;
 	}
 
+	if(strlen(stred)==0){
+		printk(KERN_WARNING "Stred is empty\n");
+	}else{
+		l=strlen(buff);
+		l--;
+		len = scnprintf(buff, STRED_SIZE, "%d ", buff[l]);
+		ret = copy_to_user(buffer, buff, len);
+		if(ret)
+			return -EFAULT;
+		printk(KERN_INFO "Succesfully read\n");
+		endRead = 1;
+	}
+
+/*
 	if(down_interruptible(&sem))
 		return -ERESTARTSYS;
 	while(strlen(stred) == 0)
@@ -191,21 +218,11 @@ ssize_t stred_read(struct file *pfile, char __user *buffer, size_t length, loff_
 			return -ERESTARTSYS;
 		if(down_interruptible(&sem))
 			return -ERESTARTSYS;
-	}
-*/
+	}*/
 
-return length;
+
+return len;
 }
-
-
-
-
-
-
-
-
-
-
 
 
 static int __init stred_init(void)
