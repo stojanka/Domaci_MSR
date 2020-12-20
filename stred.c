@@ -22,13 +22,13 @@ static struct cdev *my_cdev;
 
 DECLARE_WAIT_QUEUE_HEAD(writeQueue);
 DECLARE_WAIT_QUEUE_HEAD(readQueue);
-struct semaphore sem;
-struct fasync_struct *async_queue;
+//struct semaphore sem;
+//struct fasync_struct *async_queue;
 
 char stred[100];
 int endRead = 0;
 
-static int stred_fasync(int fd,struct file *file, int mode);
+//static int stred_fasync(int fd,struct file *file, int mode);
 int stred_open(struct inode *pinode, struct file *pfile);
 int stred_close(struct inode *pinode, struct file *pfile);
 ssize_t stred_read(struct file *pfile, char __user *buffer, size_t length, loff_t *offset);
@@ -41,14 +41,14 @@ struct file_operations my_fops =
 	.read = stred_read,
 	.write = stred_write,
 	.release = stred_close,
-	.fasync = stred_fasync,
+//.fasync = stred_fasync,
 
 };
 
-static int stred_fasync(int fd,struct file *file, int mode)
-{
-    return fasync_helper(fd, file, mode, &async_queue);
-}
+//static int stred_fasync(int fd,struct file *file, int mode)
+//{
+//    return fasync_helper(fd, file, mode, &async_queue);
+//}
 
 int stred_open(struct inode *pinode, struct file *pfile)
 {
@@ -65,18 +65,20 @@ int stred_close(struct inode *pinode, struct file *pfile)
 ssize_t stred_write(struct file *pfile, const char __user *buffer, size_t length, loff_t *offset)
 {
 	char *buff = (char *)kmalloc(length, GFP_KERNEL); //*buff je niz pokazivaca na char
-  char stred_cpy[STRED_SIZE];
+//  char stred_cpy[STRED_SIZE];
   char *pom;
 
   int ret;
   int i,j;
+	char *original;
+	original = buff;
 
   ret = copy_from_user(buff, buffer, length);
   if(ret)
   		return -EFAULT;
   buff[length-1] = '\0';
 
-	if(strlen(stred) < 99){
+	/*if(strlen(stred) < 99){
 		ret = sscanf(buff,"%s", stred);
 
 	}else{
@@ -94,7 +96,7 @@ ssize_t stred_write(struct file *pfile, const char __user *buffer, size_t length
 
 	up(&sem);
 	wake_up_interruptible(&readQueue);
-
+*/
   if(strncmp(buff, "string=", 7) == 0){
 
     strsep(&buff, "=");
@@ -108,7 +110,7 @@ ssize_t stred_write(struct file *pfile, const char __user *buffer, size_t length
   }
 
   if(strncmp(buff, "clear", 5) == 0){
-
+  strsep(&buff, "r");
     for(i=0; i< strlen(stred); i++){
       stred[i] = '0';
 			wake_up_interruptible(&writeQueue);
@@ -116,19 +118,22 @@ ssize_t stred_write(struct file *pfile, const char __user *buffer, size_t length
   }
 
   if(strncmp(buff, "shrink", 6) == 0){
-		strcpy(stred_cpy, stred);
-    strim(stred);
+		strsep(&buff, "k");
+    pom = strim(stred);
+		strcpy(stred, pom);
+
 		wake_up_interruptible(&writeQueue);
   }
 
   if(strncmp(buff, "append=", 7) == 0){
 
-    strsep(&buff, "=");
-		if (strlen(stred)+strlen(buff)>99)
+    strsep(&buff, "d");
+		strreplace(buff, '=', ' ');
+	if (strlen(stred)+strlen(buff)>99)
 			printk(KERN_ERR "String ce premasiti 100karaktera! Cekam prazno mesto...\n");
 
 		if(wait_event_interruptible(writeQueue,(strlen(stred)+strlen(buff)<=99)))
-			return -ERESTARTSYS;
+			return -ERESTARTSYS; //sistemski poziv je potrebno pozvati ponovo
 
 		strncat(stred, buff, strlen(buff));
   }
@@ -177,7 +182,7 @@ wake_up_interruptible(&writeQueue);
 
 printk("Buff je: %s \n", buff);
 printk("Stred je: %s \n", stred);
-  kfree(buff);
+  kfree(original);
 	return length;
 
 }
@@ -185,8 +190,9 @@ printk("Stred je: %s \n", stred);
 
 ssize_t stred_read(struct file *pfile, char __user *buffer, size_t length, loff_t *offset)
 {
-	int ret;
-char buff[STRED_SIZE];
+/*	int ret;
+//char buff[STRED_SIZE];
+char *buff = (char *)kmalloc(length, GFP_KERNEL);
 long int len = 0;
 int l=0;
 
@@ -206,7 +212,7 @@ int l=0;
 			return -EFAULT;
 		printk(KERN_INFO "Succesfully read\n");
 		endRead = 1;
-	}
+	} */
 
 /*
 	if(down_interruptible(&sem))
@@ -220,8 +226,8 @@ int l=0;
 			return -ERESTARTSYS;
 	}*/
 
-
-return len;
+//kfree(buff);
+return length;
 }
 
 
@@ -230,7 +236,7 @@ static int __init stred_init(void)
   int ret = 0;
     int i=0;
 
-    //sema_init(&sem,1);
+  //  sema_init(&sem,1);
 
     //Initialize array
     for (i=0; i<100; i++)
