@@ -22,13 +22,11 @@ static struct cdev *my_cdev;
 
 DECLARE_WAIT_QUEUE_HEAD(writeQueue);
 DECLARE_WAIT_QUEUE_HEAD(readQueue);
-//struct semaphore sem;
-//struct fasync_struct *async_queue;
+struct semaphore sem;
 
 char stred[100];
 int endRead = 0;
 
-//static int stred_fasync(int fd,struct file *file, int mode);
 int stred_open(struct inode *pinode, struct file *pfile);
 int stred_close(struct inode *pinode, struct file *pfile);
 ssize_t stred_read(struct file *pfile, char __user *buffer, size_t length, loff_t *offset);
@@ -41,14 +39,8 @@ struct file_operations my_fops =
 	.read = stred_read,
 	.write = stred_write,
 	.release = stred_close,
-//.fasync = stred_fasync,
-
 };
 
-//static int stred_fasync(int fd,struct file *file, int mode)
-//{
-//    return fasync_helper(fd, file, mode, &async_queue);
-//}
 
 int stred_open(struct inode *pinode, struct file *pfile)
 {
@@ -73,30 +65,11 @@ ssize_t stred_write(struct file *pfile, const char __user *buffer, size_t length
 	char *original;
 	original = buff;
 
-  ret = copy_from_user(buff, buffer, length);
-  if(ret)
-  		return -EFAULT;
-  buff[length-1] = '\0';
+	ret = copy_from_user(buff, buffer, length);
+	if(ret)
+			return -EFAULT;
+	buff[length-1] = '\0';
 
-	/*if(strlen(stred) < 99){
-		ret = sscanf(buff,"%s", stred);
-
-	}else{
-		printk(KERN_WARNING "Stred is full\n");
-	}
-
-	while(strlen(stred) == 99)
-	{
-		up(&sem);
-		if(wait_event_interruptible(writeQueue,(strlen(stred)<99)))
-			return -ERESTARTSYS;
-		if(down_interruptible(&sem))
-			return -ERESTARTSYS;
-	}
-
-	up(&sem);
-	wake_up_interruptible(&readQueue);
-*/
   if(strncmp(buff, "string=", 7) == 0){
 
     strsep(&buff, "=");
@@ -190,44 +163,26 @@ printk("Stred je: %s \n", stred);
 
 ssize_t stred_read(struct file *pfile, char __user *buffer, size_t length, loff_t *offset)
 {
-/*	int ret;
-//char buff[STRED_SIZE];
-char *buff = (char *)kmalloc(length, GFP_KERNEL);
-long int len = 0;
-int l=0;
+int ret;
 
-	if (endRead){
-		endRead = 0;
-		return 0;
-	}
+if(endRead){
+	endRead=0;
+	printk(KERN_INFO "Succesfully read from file \n");
+	return 0;
+}
 
-	if(strlen(stred)==0){
-		printk(KERN_WARNING "Stred is empty\n");
-	}else{
-		l=strlen(buff);
-		l--;
-		len = scnprintf(buff, STRED_SIZE, "%d ", buff[l]);
-		ret = copy_to_user(buffer, buff, len);
-		if(ret)
-			return -EFAULT;
-		printk(KERN_INFO "Succesfully read\n");
-		endRead = 1;
-	} */
+ret= copy_to_user(buffer, stred, strlen(stred)); //kopiramo iz kernrl u korisnicki prostor, vraca 0 ako je uspjesno kopirano
+if(ret)
+	return -EFAULT;
 
-/*
-	if(down_interruptible(&sem))
-		return -ERESTARTSYS;
-	while(strlen(stred) == 0)
-	{
-		up(&sem);
-		if(wait_event_interruptible(readQueue,(strlen(stred)>0)))
-			return -ERESTARTSYS;
-		if(down_interruptible(&sem))
-			return -ERESTARTSYS;
-	}*/
+if(strlen(stred)>0){
+	endRead = 1;
+}else{
+	printk(KERN_WARNING "Stred is empty")
+	return 0;
+}
 
-//kfree(buff);
-return length;
+return strlen(stred);
 }
 
 
@@ -235,8 +190,6 @@ static int __init stred_init(void)
 {
   int ret = 0;
     int i=0;
-
-  //  sema_init(&sem,1);
 
     //Initialize array
     for (i=0; i<100; i++)
