@@ -78,7 +78,7 @@ ssize_t stred_write(struct file *pfile, const char __user *buffer, size_t length
 
 		if(wait_event_interruptible(writeQueue,(strlen(stred)+strlen(buff)<=99)))
 			return -ERESTARTSYS;
-
+	wake_up_interruptible(&readQueue);
 		strcpy(stred, buff);
   }
 
@@ -107,7 +107,7 @@ ssize_t stred_write(struct file *pfile, const char __user *buffer, size_t length
 
 		if(wait_event_interruptible(writeQueue,(strlen(stred)+strlen(buff)<=99)))
 			return -ERESTARTSYS; //sistemski poziv je potrebno pozvati ponovo
-
+	wake_up_interruptible(&readQueue);
 		strncat(stred, buff, strlen(buff));
   }
 
@@ -170,17 +170,18 @@ if(endRead){
 	printk(KERN_INFO "Succesfully read from file \n");
 	return 0;
 }
-
-ret= copy_to_user(buffer, stred, strlen(stred)); //kopiramo iz kernrl u korisnicki prostor, vraca 0 ako je uspjesno kopirano
-if(ret)
-	return -EFAULT;
+if(wait_event_interruptible(readQueue,(strlen(stred) > 0))) //budi se tek kada se u stred upise nesto
+	return -ERESTARTSYS; //resetujem sistemski poziv
 
 if(strlen(stred)>0){
-	endRead = 1;
+	ret= copy_to_user(buffer, stred, strlen(stred));
+	if(ret)
+		return -EFAULT;
 }else{
-	printk(KERN_WARNING "Stred is empty")
-	return 0;
+	printk(KERN_WARNING "Stred is empty \n");
 }
+wake_up_interruptible(&writeQueue); //cim procitam nesto budim ovaj proces
+endRead = 1;
 
 return strlen(stred);
 }
