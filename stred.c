@@ -86,8 +86,8 @@ ssize_t stred_write(struct file *pfile, const char __user *buffer, size_t length
   strsep(&buff, "r");
     for(i=0; i< strlen(stred); i++){
       stred[i] = '0';
-			wake_up_interruptible(&writeQueue);
     }
+		wake_up_interruptible(&writeQueue);
   }
 
   if(strncmp(buff, "shrink", 6) == 0){
@@ -107,6 +107,7 @@ ssize_t stred_write(struct file *pfile, const char __user *buffer, size_t length
 
 		if(wait_event_interruptible(writeQueue,(strlen(stred)+strlen(buff)<=99)))
 			return -ERESTARTSYS; //sistemski poziv je potrebno pozvati ponovo
+
 	wake_up_interruptible(&readQueue);
 		strncat(stred, buff, strlen(buff));
   }
@@ -114,8 +115,11 @@ ssize_t stred_write(struct file *pfile, const char __user *buffer, size_t length
   if(strncmp(buff, "truncate=", 9) == 0){
 		strsep(&buff, "=");
 		kstrtoint(buff, 10, &ret);
-		stred[strlen(stred)-ret] = '\0';
-
+		if(ret<99){
+			stred[strlen(stred)-ret] = '\0';
+		}else{
+			printk(KERN_WARNING "The number is out of range\n");
+		}
 		wake_up_interruptible(&writeQueue);
   }
 
