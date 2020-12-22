@@ -4,8 +4,8 @@
 
 int main(){
 FILE *stred;
-char buffer[120];
-char string1[8];
+char buffer[110];
+char string1[10];
 int choice;
 int l;
 
@@ -18,8 +18,9 @@ while(1){
   printf("5: Izbriši vodeće i prateće space karaktere \n");
   printf("6: Izbriši izraz iz stringa \n");
   printf("7: Izbriši poslednjih n karaktera iz stringa \n");
+  printf("8: Izlaz \n");
 
-  printf("Izaberite opciju (1-7): ");
+  printf("Izaberite opciju (1-8): ");
   scanf("%d", &choice);
 
 switch(choice){
@@ -46,6 +47,7 @@ switch(choice){
     fwrite(strcat(string1, buffer), 1, 100, stred);*/
 
     strcpy(buffer,"string=");
+    printf("Buffer nakon string= %s \n", buffer);
     printf("Upisite novi string: ");
     fgets(buffer+7, 100, stdin);
     fwrite(buffer, 1, 100, stred);
@@ -55,12 +57,13 @@ switch(choice){
 
   case 3: {
     stred=fopen("/dev/stred", "w");
-    strcpy(buffer,"append=");
+    strcpy(string1,"append=");
+    //printf("Buffer nakon append= %s", buffer);
     printf("Dodajte novi string: ");
-    fgets(buffer+7, 100, stdin);
-
-    //scanf("%s",buffer+7);
-    fwrite(buffer, 1, 100, stred);
+    fgets(buffer, 100, stdin);
+    //scanf("%[^\n]%*c",buffer+7);
+  //  scanf("%s",buffer+7);
+    fwrite(strcat(string1, buffer), 1, 100, stred);
     fclose(stred);
     break;
   }
@@ -76,7 +79,7 @@ switch(choice){
   case 5: {
     stred=fopen("/dev/stred", "w");
     strcpy(buffer, "shrink");
-    fwrite(buffer, 1, 100, stred);
+    fwrite(buffer+7, 1, 100, stred);
     fclose(stred);
     break;
   }
@@ -85,8 +88,9 @@ switch(choice){
     stred=fopen("/dev/stred", "w");
     strcpy(buffer,"remove=");
     printf("Napisite koju rec zelite da izbrisete: ");
-    fgets(buffer+7, 100, stdin);
-    //scanf("%s",buffer+7);
+    //fgets(buffer+7, 100, stdin);
+    //scanf("%[^\n]%*c",buffer+7);
+    scanf("%s",buffer+7);
     fwrite(buffer, 1, 100, stred);
     fclose(stred);
     break;
@@ -94,15 +98,22 @@ switch(choice){
 
   case 7: {
     stred=fopen("/dev/stred", "w");
-    strcpy(buffer,"truncate=");
-    printf("Koliko karaktera zalite da izbrisete n= ");
-    fgets(buffer+9, 100, stdin);
+    strcpy(string1,"truncate=");
+    printf("Koliko karaktera zalite da izbrisete n=");
+    //fgets(buffer+9, 100, stdin);
     //scanf("%[^\n]%*c",buffer+9);
-    fwrite(buffer, 1, 100, stred);
+    scanf("%s",buffer);
+    l=atoi(buffer);
+    l++;
+    sprintf(buffer, "%d", l);
+    fwrite(strcat(string1, buffer), 1, 100, stred);
     fclose(stred);
     break;
   }
-
+  case 8:{
+     printf("Kraj.\n");
+    break;
+  }
   default:
   printf("Izabrali ste broj koji ne postoji u meniju :(. \n");
 

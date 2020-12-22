@@ -56,8 +56,7 @@ int stred_close(struct inode *pinode, struct file *pfile)
 
 ssize_t stred_write(struct file *pfile, const char __user *buffer, size_t length, loff_t *offset)
 {
-	char *buff = (char *)kmalloc(length, GFP_KERNEL); //*buff je niz pokazivaca na char
-//  char stred_cpy[STRED_SIZE];
+	char *buff = (char *)kmalloc(length, GFP_KERNEL);
   char *pom;
 
   int ret;
@@ -73,13 +72,16 @@ ssize_t stred_write(struct file *pfile, const char __user *buffer, size_t length
   if(strncmp(buff, "string=", 7) == 0){
 
     strsep(&buff, "=");
-		if (strlen(stred)+strlen(buff)>99)
-			printk(KERN_ERR "String ce premasiti 100karaktera! Cekam prazno mesto...\n");
+		if (strlen(buff)>99){
+			printk(KERN_ERR "String ce premasiti 100karaktera!\n");
+		}else{
+			strcpy(stred, buff);
+		}
+		//if(wait_event_interruptible(writeQueue,(strlen(stred)+strlen(buff)<=99)))
+			//return -ERESTARTSYS;
 
-		if(wait_event_interruptible(writeQueue,(strlen(stred)+strlen(buff)<=99)))
-			return -ERESTARTSYS;
-	wake_up_interruptible(&readQueue);
-		strcpy(stred, buff);
+		//strcpy(stred, buff);
+		wake_up_interruptible(&readQueue);
   }
 
   if(strncmp(buff, "clear", 5) == 0){
@@ -103,23 +105,24 @@ ssize_t stred_write(struct file *pfile, const char __user *buffer, size_t length
     strsep(&buff, "d");
 		strreplace(buff, '=', ' ');
 	if (strlen(stred)+strlen(buff)>99)
-			printk(KERN_ERR "String ce premasiti 100karaktera! Cekam prazno mesto...\n");
+			printk(KERN_ERR "String ce premasiti 100karaktera!\n");
 
 		if(wait_event_interruptible(writeQueue,(strlen(stred)+strlen(buff)<=99)))
 			return -ERESTARTSYS; //sistemski poziv je potrebno pozvati ponovo
 
-	wake_up_interruptible(&readQueue);
 		strncat(stred, buff, strlen(buff));
+		wake_up_interruptible(&readQueue);
   }
 
   if(strncmp(buff, "truncate=", 9) == 0){
 		strsep(&buff, "=");
 		kstrtoint(buff, 10, &ret);
-		if(ret<99){
-			stred[strlen(stred)-ret] = '\0';
-		}else{
-			printk(KERN_WARNING "The number is out of range\n");
-		}
+			if(ret > strlen(stred)){
+				printk(KERN_WARNING "The number is out of range\n");
+
+			}else{
+				stred[strlen(stred)-ret] = '\0';
+			}
 		wake_up_interruptible(&writeQueue);
   }
 
