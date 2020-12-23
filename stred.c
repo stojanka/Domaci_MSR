@@ -12,7 +12,8 @@
 #include <linux/slab.h>
 #include <linux/semaphore.h>
 #include <linux/wait.h>
-#define STRED_SIZE 100
+
+
 MODULE_LICENSE("Dual BSD/GPL");
 
 dev_t my_dev_id;
@@ -22,6 +23,7 @@ static struct cdev *my_cdev;
 
 DECLARE_WAIT_QUEUE_HEAD(writeQueue);
 DECLARE_WAIT_QUEUE_HEAD(readQueue);
+
 struct semaphore sem;
 
 char stred[100];
@@ -58,6 +60,7 @@ ssize_t stred_write(struct file *pfile, const char __user *buffer, size_t length
 {
 	char *buff = (char *)kmalloc(length, GFP_KERNEL);
   char *pom;
+	char *pom2;
 
   int ret;
   int i,j;
@@ -69,18 +72,31 @@ ssize_t stred_write(struct file *pfile, const char __user *buffer, size_t length
 			return -EFAULT;
 	buff[length-1] = '\0';
 
-  if(strncmp(buff, "string=", 7) == 0){
 
+	if(strncmp(buff, "append=", 7) == 0){
+		pom2 = buff+6;
+	}
+	if(down_interruptible(&sem))
+		return -ERESTARTSYS;
+	while((strlen(stred)+strlen(buff)>99)){
+		up(&sem);
+		if(wait_event_interruptible(writeQueue,(strlen(stred)+strlen(buff)<99)))
+			return -ERESTARTSYS;
+		if(down_interruptible(&sem))
+			return -ERESTARTSYS;
+	}
+
+
+  if(strncmp(buff, "string=", 7) == 0){
     strsep(&buff, "=");
+
 		if (strlen(buff)>99){
 			printk(KERN_ERR "String ce premasiti 100karaktera!\n");
 		}else{
+			printk(KERN_INFO "Succesfully wrote %s", buff);
 			strcpy(stred, buff);
 		}
-		//if(wait_event_interruptible(writeQueue,(strlen(stred)+strlen(buff)<=99)))
-			//return -ERESTARTSYS;
 
-		//strcpy(stred, buff);
 		wake_up_interruptible(&readQueue);
   }
 
@@ -103,7 +119,8 @@ ssize_t stred_write(struct file *pfile, const char __user *buffer, size_t length
   if(strncmp(buff, "append=", 7) == 0){
 
     strsep(&buff, "d");
-		strreplace(buff, '=', ' ');
+		buff[0]=' ';
+
 	if (strlen(stred)+strlen(buff)>99)
 			printk(KERN_ERR "String ce premasiti 100karaktera!\n");
 
@@ -159,12 +176,11 @@ stred[j] = '\0';
 wake_up_interruptible(&writeQueue);
 } // od remove
 
-
+up(&sem);
 printk("Buff je: %s \n", buff);
 printk("Stred je: %s \n", stred);
   kfree(original);
 	return length;
-
 }
 
 
@@ -177,6 +193,8 @@ if(endRead){
 	printk(KERN_INFO "Succesfully read from file \n");
 	return 0;
 }
+
+
 if(wait_event_interruptible(readQueue,(strlen(stred) > 0))) //budi se tek kada se u stred upise nesto
 	return -ERESTARTSYS; //resetujem sistemski poziv
 
@@ -199,11 +217,13 @@ static int __init stred_init(void)
   int ret = 0;
     int i=0;
 
+		sema_init(&sem,1);
+
     //Initialize array
     for (i=0; i<100; i++)
       stred[i] = 0;
 
-  ret = alloc_chrdev_region(&my_dev_id, 0, 1, "stred");
+  ret = alloc_chrdev_region(&my_dev_id, 0, 1, "stred"); //Dinamicka alokacija upravljackih brojeva
   if (ret){
       printk(KERN_ERR "failed to register char device\n");
       return ret;

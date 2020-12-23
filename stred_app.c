@@ -56,14 +56,13 @@ switch(choice){
   }
 
   case 3: {
+    fflush(stdin);
     stred=fopen("/dev/stred", "w");
-    strcpy(string1,"append=");
-    //printf("Buffer nakon append= %s", buffer);
+    strcpy(buffer,"append=");
     printf("Dodajte novi string: ");
-    fgets(buffer, 100, stdin);
-    //scanf("%[^\n]%*c",buffer+7);
-  //  scanf("%s",buffer+7);
-    fwrite(strcat(string1, buffer), 1, 100, stred);
+    fgets(buffer+7, 100, stdin);
+    fflush(stdin);
+    fwrite(buffer, 1, 100, stred);
     fclose(stred);
     break;
   }
