@@ -4,7 +4,7 @@
 
 int main(){
 FILE *stred;
-char buffer[110];
+char *buffer = malloc(110*sizeof(char));
 char string1[10];
 int choice;
 int l;
@@ -49,19 +49,20 @@ switch(choice){
     strcpy(buffer,"string=");
     printf("Buffer nakon string= %s \n", buffer);
     printf("Upisite novi string: ");
+    fflush(stdin);
     fgets(buffer+7, 100, stdin);
     fwrite(buffer, 1, 100, stred);
+
     fclose(stred);
     break;
   }
 
   case 3: {
-    fflush(stdin);
     stred=fopen("/dev/stred", "w");
     strcpy(buffer,"append=");
     printf("Dodajte novi string: ");
     fgets(buffer+7, 100, stdin);
-    fflush(stdin);
+    printf("%s\n", buffer);
     fwrite(buffer, 1, 100, stred);
     fclose(stred);
     break;
@@ -120,7 +121,7 @@ switch(choice){
 
 
 }
-
+free(buffer);
 
   return 0;
 }
