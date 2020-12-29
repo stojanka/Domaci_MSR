@@ -8,6 +8,7 @@ char *buffer = malloc(110*sizeof(char));
 char string1[10];
 int choice;
 int l;
+int size;
 
 while(1){
   printf("Meni: \n");
@@ -26,9 +27,19 @@ while(1){
 switch(choice){
   case 1: {
     stred = fopen("/dev/stred", "r");
-    l=fread(buffer, 1, 100, stred);
-    buffer[l]=0;
-    printf("%s\n", buffer);
+    if (NULL != stred) {
+      fseek (stred, 0, SEEK_END);
+      size = ftell(stred);
+
+      if (0 == size) {
+        printf("file is empty\n");
+      }
+    }else{
+      l=fread(buffer, 1, 100, stred);
+      strsep(&buffer, "=");
+      buffer[l]=0;
+      printf("Trenutno stanje stringa je: %s\n", buffer);
+    }
     fclose(stred);
     break;
   }
@@ -47,10 +58,10 @@ switch(choice){
     fwrite(strcat(string1, buffer), 1, 100, stred);*/
 
     strcpy(buffer,"string=");
-    printf("Buffer nakon string= %s \n", buffer);
     printf("Upisite novi string: ");
-    fflush(stdin);
-    fgets(buffer+7, 100, stdin);
+    fflush(stdout);
+    //fgets(buffer+7, 100, stdin);
+    scanf("%s",buffer+7);
     fwrite(buffer, 1, 100, stred);
 
     fclose(stred);
@@ -61,8 +72,9 @@ switch(choice){
     stred=fopen("/dev/stred", "w");
     strcpy(buffer,"append=");
     printf("Dodajte novi string: ");
+    while((l=getchar())!= '\n' && l!=EOF);
     fgets(buffer+7, 100, stdin);
-    printf("%s\n", buffer);
+    printf("%s", buffer+7);
     fwrite(buffer, 1, 100, stred);
     fclose(stred);
     break;
@@ -112,6 +124,7 @@ switch(choice){
   }
   case 8:{
      printf("Kraj.\n");
+     exit(1);
     break;
   }
   default:

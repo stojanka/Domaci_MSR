@@ -177,8 +177,8 @@ wake_up_interruptible(&writeQueue);
 } // od remove
 
 up(&sem);
-printk("Buff je: %s \n", buff);
-printk("Stred je: %s \n", stred);
+printk("Buff je: %s", buff);
+printk("Stred je: %s", stred);
   kfree(original);
 	return length;
 }
